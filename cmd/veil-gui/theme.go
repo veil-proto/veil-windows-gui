@@ -64,17 +64,20 @@ func (veilTheme) Color(name fyne.ThemeColorName, _ fyne.ThemeVariant) color.Colo
 func (veilTheme) Font(s fyne.TextStyle) fyne.Resource     { return theme.DefaultTheme().Font(s) }
 func (veilTheme) Icon(n fyne.ThemeIconName) fyne.Resource { return theme.DefaultTheme().Icon(n) }
 
-// Size tightens a handful of metrics so the main window fits at 440x640:
-//   - Padding: tighter than default so sections don't blow out
+// Size tunes a handful of metrics for the VEIL brand look. The window used to
+// be fixed at 440x640, which forced very tight padding to avoid clipping;
+// now that it's resizable (with scrollable sections absorbing overflow), the
+// padding can breathe a little more without risking clipped content:
+//   - Padding: denser than Fyne's default, but no longer squeezed to the bone
 //   - InnerPadding: same for nested containers
 //   - Text: bumped very slightly so labels read at small sizes
 //   - InputBorder: thin to keep the input bar visually quiet
 func (veilTheme) Size(n fyne.ThemeSizeName) float32 {
 	switch n {
 	case theme.SizeNamePadding:
-		return 5
+		return 8
 	case theme.SizeNameInnerPadding:
-		return 6
+		return 10
 	case theme.SizeNameText:
 		return 14
 	case theme.SizeNameHeadingText:

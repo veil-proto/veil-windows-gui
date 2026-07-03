@@ -1,11 +1,12 @@
 //go:build windows
 
-// Command veil-gui is the VEIL Windows GUI: a small fixed-size window plus a
-// tray icon that drive the veil-service tunnel over its control pipe.
-// Double-click to launch; closing the window hides it to the tray (the tunnel
-// keeps running in the service). Deliberately low-noise per the brandbook:
-// one connection state, a config picker, traffic, link import, and .conf
-// file import (file dialog or drag-and-drop).
+// Command veil-gui is the VEIL Windows GUI: a resizable window plus a tray
+// icon that drive the veil-service tunnel over its control pipe. Double-click
+// to launch; closing the window hides it to the tray (the tunnel keeps
+// running in the service). Deliberately low-noise per the brandbook: one
+// connection state, a config picker, traffic, link import, and .conf file
+// import (file dialog or drag-and-drop), plus a structured split-tunnel
+// editor and live service logs in their own tabs.
 package main
 
 import (
@@ -35,12 +36,12 @@ var appIcon = fyne.NewStaticResource("veil.png", iconPNG)
 
 const pollInterval = 1500 * time.Millisecond
 
-// windowSize is the one true size of the main window. The window is fixed so
-// it never stretches arbitrarily when the user drags its border; the layout
-// below is built to fit this size exactly.
+// windowW/windowH are the starting size of the main window. The window is
+// resizable (see main below) so the structured split-tunnel table has room
+// to breathe.
 const (
-	windowW = 440
-	windowH = 640
+	windowW = 480
+	windowH = 680
 )
 
 type ui struct {
@@ -69,6 +70,9 @@ type ui struct {
 	// extra tabs
 	configEditor *widget.Entry
 	logViewer    *widget.Entry
+	logsSince    uint64 // cursor for the last log line already appended to logViewer
+
+	splitTunnel *splitTunnelTab
 
 	configs []configEntry
 }
@@ -81,10 +85,13 @@ func main() {
 	w := a.NewWindow("VEIL")
 	w.SetIcon(appIcon)
 	w.Resize(fyne.NewSize(windowW, windowH))
-	// Lock the window: the layout below is sized for this exact canvas. A
-	// fixed window also stops the user from accidentally stretching the
-	// status text into awkward line breaks.
-	w.SetFixedSize(true)
+	// The window is resizable — the split-tunnel AllowedIPs/Disallowed table
+	// needs room to grow, and the old fixed 440x640 window left no space for
+	// it. Fyne has no direct "min size" window API; the effective floor
+	// comes from the content's own MinSize (a padded VBox of labels/buttons/
+	// a table with a sensible min row count), and every growing section is
+	// wrapped in container.NewVScroll so content beyond that floor scrolls
+	// instead of forcing the window to keep growing.
 
 	u := &ui{win: w}
 	w.SetContent(u.build())
@@ -108,10 +115,12 @@ func main() {
 	w.ShowAndRun()
 }
 
-// build lays out the main window. Layout is divided into three card-style
-// sections separated by thin rules: status, connection control, and import.
-// Each section is wrapped in padded containers so the content never touches
-// the window edges and never reflows when the window would otherwise resize.
+// build lays out the main window. The Connection tab is divided into three
+// card-style sections separated by thin rules (theme.ColorNameSeparator):
+// status, connection control, and import. Each section is padded so content
+// never touches the window edges, and the whole tab is wrapped in a
+// VScroll so a resize below the natural content height scrolls instead of
+// clipping. Split Tunnel, Advanced, and Logs are separate tabs alongside it.
 func (u *ui) build() fyne.CanvasObject {
 	u.logo = canvas.NewImageFromResource(appIcon)
 	u.logo.FillMode = canvas.ImageFillContain
@@ -195,7 +204,12 @@ func (u *ui) build() fyne.CanvasObject {
 		u.fileBtn,
 	)
 
-	mainScreen := container.NewPadded(
+	// The window is no longer squeezed to a fixed 440x640, so sections get a
+	// visible separator plus their own padding instead of everything being
+	// crammed edge-to-edge. NewVScroll means a taller-than-usual status/peer
+	// list (or a small window on a cramped display) never clips content —
+	// it scrolls instead of overflowing.
+	mainScreen := container.NewVScroll(container.NewPadded(
 		container.NewVBox(
 			statusBlock,
 			widget.NewSeparator(),
@@ -205,11 +219,12 @@ func (u *ui) build() fyne.CanvasObject {
 			widget.NewSeparator(),
 			container.NewPadded(importBlock),
 		),
-	)
+	))
 
 	return container.NewAppTabs(
 		container.NewTabItem("Connection", mainScreen),
-		container.NewTabItem("Config", container.NewPadded(u.buildConfigTab())),
+		container.NewTabItem("Split Tunnel", container.NewPadded(u.buildSplitTunnelTab())),
+		container.NewTabItem("Advanced", container.NewPadded(u.buildConfigTab())),
 		container.NewTabItem("Logs", container.NewPadded(u.buildLogTab())),
 	)
 }
@@ -230,13 +245,24 @@ func newSectionLabel(text string) fyne.CanvasObject {
 }
 
 // pollLoop refreshes status every pollInterval; UI writes go through fyne.Do
-// so they run on the main goroutine.
+// so they run on the main goroutine. It also polls for new log lines on the
+// same cadence — logs use the same request/response named-pipe protocol as
+// status, so a second long-lived streaming connection isn't worth the
+// complexity; piggybacking on the existing poll tick keeps one cadence to
+// reason about and one goroutine driving all periodic UI updates.
 func (u *ui) pollLoop() {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
 		resp, err := status()
 		fyne.Do(func() { u.apply(resp, err) })
+
+		logs, lerr := fetchLogs(u.logsSince)
+		if lerr == nil && len(logs) > 0 {
+			u.logsSince = logs[len(logs)-1].Seq
+			fyne.Do(func() { u.appendLogs(logs) })
+		}
+
 		<-ticker.C
 	}
 }
@@ -350,8 +376,13 @@ func (u *ui) connectSelected() {
 		u.detail.SetText(err.Error())
 		return
 	}
+	// Apply any GUI-only Disallowed-subnet carve-outs (Split Tunnel tab)
+	// before the config text ever leaves the process. The on-disk config
+	// and the sidecar are untouched by this — only the text sent to the
+	// service is reduced.
+	sendText := effectiveConfigText(entry.Path, string(text))
 	go func() {
-		resp, err := connect(string(text), entry.Name)
+		resp, err := connect(sendText, entry.Name)
 		fyne.Do(func() { u.apply(resp, err) })
 	}()
 }

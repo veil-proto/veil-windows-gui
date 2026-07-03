@@ -45,6 +45,20 @@ func disconnect() (control.Response, error) {
 	return c.Disconnect()
 }
 
+// fetchLogs pulls every log line the service has captured since the given
+// cursor. Errors (e.g. service unavailable) are treated as "no new logs" by
+// the caller rather than surfaced as a connection-status error, since the
+// Logs tab is secondary to the main connection status already shown by
+// status().
+func fetchLogs(since uint64) ([]control.LogLine, error) {
+	c, err := client()
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+	return c.Logs(since)
+}
+
 func human(n uint64) string {
 	const unit = 1024
 	if n < unit {

@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,7 +21,15 @@ type persistingHandler struct {
 }
 
 func newHandler() *persistingHandler {
-	return &persistingHandler{Tunnel: &wintunnel.Tunnel{}}
+	t := &wintunnel.Tunnel{}
+	// Route the process's default log output through the tunnel's ring
+	// buffer (in addition to stderr) so every existing log.Printf call site
+	// across the engine/service code is captured for the Logs control
+	// command, with no call-site changes required. This must happen before
+	// anything logs (in particular before autoReconnect below), and the
+	// buffer is process-lifetime so it survives Connect/Disconnect cycles.
+	log.SetOutput(io.MultiWriter(os.Stderr, t.LogBuffer()))
+	return &persistingHandler{Tunnel: t}
 }
 
 type activeConfig struct {
