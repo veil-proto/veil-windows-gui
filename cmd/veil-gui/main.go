@@ -66,6 +66,10 @@ type ui struct {
 	pasteBtn  *widget.Button
 	fileBtn   *widget.Button
 
+	// extra tabs
+	configEditor *widget.Entry
+	logViewer    *widget.Entry
+
 	configs []configEntry
 }
 
@@ -124,7 +128,17 @@ func (u *ui) build() fyne.CanvasObject {
 	u.traffic = newMuted("")
 	u.handshake = newMuted("")
 
-	u.configSel = widget.NewSelect(nil, nil)
+	u.configSel = widget.NewSelect(nil, func(selected string) {
+		if u.configEditor != nil {
+			entry, ok := u.selectedConfig()
+			if ok {
+				text, _ := os.ReadFile(entry.Path)
+				u.configEditor.SetText(string(text))
+			} else {
+				u.configEditor.SetText("")
+			}
+		}
+	})
 	u.configSel.PlaceHolder = "Select a config"
 	u.refreshConfigs()
 
@@ -181,7 +195,7 @@ func (u *ui) build() fyne.CanvasObject {
 		u.fileBtn,
 	)
 
-	return container.NewPadded(
+	mainScreen := container.NewPadded(
 		container.NewVBox(
 			statusBlock,
 			widget.NewSeparator(),
@@ -191,6 +205,12 @@ func (u *ui) build() fyne.CanvasObject {
 			widget.NewSeparator(),
 			container.NewPadded(importBlock),
 		),
+	)
+
+	return container.NewAppTabs(
+		container.NewTabItem("Connection", mainScreen),
+		container.NewTabItem("Config", container.NewPadded(u.buildConfigTab())),
+		container.NewTabItem("Logs", container.NewPadded(u.buildLogTab())),
 	)
 }
 
