@@ -74,8 +74,12 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/veil-proto/veil v0.0.0-20260703165841-14d8a4a23bad h1:OBSOUHjY6ydgQJc2BaJNH5+NuZqUMcHIrlcRyn9uDHA=
 github.com/veil-proto/veil v0.0.0-20260703165841-14d8a4a23bad/go.mod h1:qCgUj7KT9twViyDHTvCvAbP3W9BevwLXDsYOYkyAZzY=
+github.com/veil-proto/veil v0.0.0-20260703210040-6a17f5d48421 h1:xxE9s1whqYHbQqO5ov6CyESPM+V8IX9+NmNGJlehG50=
+github.com/veil-proto/veil v0.0.0-20260703210040-6a17f5d48421/go.mod h1:qCgUj7KT9twViyDHTvCvAbP3W9BevwLXDsYOYkyAZzY=
 github.com/veil-proto/veil-windows v0.0.0-20260703165610-2955091d0de3 h1:IEq8B4Zy1N7pmSr3Pjt8MAXP4sSpn5BpiqVwUIyTfcs=
 github.com/veil-proto/veil-windows v0.0.0-20260703165610-2955091d0de3/go.mod h1:FUZlDR2yREg5FhoL7wwAY4651qZ/6iB4L80Z4/9gKIk=
+github.com/veil-proto/veil-windows v0.0.0-20260703210527-a531beb862eb h1:IGyjzn2LBADS/D0FXabBzbo7WnAp+x3/A/2pa2Qjino=
+github.com/veil-proto/veil-windows v0.0.0-20260703210527-a531beb862eb/go.mod h1:ug0b7TC3veNOPjZnCjcWXmKW0y/5js4B94hEZhaOi70=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/yuin/goldmark v1.7.8 h1:iERMLn0/QJeHFhxSt3p6PeN9mGnvIKSpG9YYorDMnic=
 github.com/yuin/goldmark v1.7.8/go.mod h1:uzxRWxtg69N339t3louHJ7+O03ezfj6PlliRlaOzY1E=

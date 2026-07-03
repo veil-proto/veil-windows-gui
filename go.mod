@@ -4,8 +4,8 @@ go 1.26
 
 require (
 	fyne.io/fyne/v2 v2.7.4
-	github.com/veil-proto/veil v0.0.0-20260703165841-14d8a4a23bad
-	github.com/veil-proto/veil-windows v0.0.0-20260703165610-2955091d0de3
+	github.com/veil-proto/veil v0.0.0-20260703210040-6a17f5d48421
+	github.com/veil-proto/veil-windows v0.0.0-20260703210527-a531beb862eb
 	golang.org/x/sys v0.30.0
 )
 
