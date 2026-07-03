@@ -1,0 +1,58 @@
+name: Prerelease
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          check-latest: true
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc
+      - name: Build binaries
+        shell: pwsh
+        run: |
+          $ver = Get-Date -Format "yy.M.d"
+          $sha = "${env:GITHUB_SHA}".Substring(0, 7)
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $env:Path = "C:\msys64\mingw64\bin;$env:Path"
+          $env:CGO_ENABLED = "1"
+          go build -trimpath -ldflags "-s -w -H windowsgui" -o dist\veil-gui.exe .\cmd\veil-gui
+          go build -trimpath -ldflags "-s -w" -o dist\veil-service.exe .\cmd\veil-service
+          Copy-Item driver\amd64\veiltun.dll dist\veiltun.dll
+          "VERSION=$ver" >> $env:GITHUB_ENV
+          "SHORT_SHA=$sha" >> $env:GITHUB_ENV
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          $env:Path += ";$env:USERPROFILE\.dotnet\tools"
+          wix build packaging\veil.wxs `
+            -arch x64 `
+            -d SourceDir="$PWD\dist" `
+            -d Version="$env:VERSION" `
+            -o "dist\VEIL-$env:VERSION-$env:SHORT_SHA-x64.msi"
+          Get-FileHash dist\* | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } | Set-Content dist\SHA256SUMS
+      - name: Publish rolling prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete prerelease --yes --cleanup-tag 2>$null
+          gh release create prerelease dist\* `
+            --prerelease `
+            --title "Prerelease $env:VERSION ($env:SHORT_SHA)" `
+            --notes "Rolling Windows GUI prerelease from ``$env:GITHUB_SHA``. Includes VEIL MSI, GUI, service, and veiltun.dll."
