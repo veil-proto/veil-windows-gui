@@ -4,9 +4,9 @@ go 1.26
 
 require (
 	fyne.io/fyne/v2 v2.7.4
-	github.com/veil-proto/veil v0.0.0-20260703210040-6a17f5d48421
-	github.com/veil-proto/veil-windows v0.0.0-20260703210527-a531beb862eb
-	golang.org/x/sys v0.30.0
+	github.com/veil-proto/veil v0.0.0-20260703213942-c8c7f0fe6962
+	github.com/veil-proto/veil-windows v0.0.0-20260703214728-a193eae0f017
+	golang.org/x/sys v0.46.0
 )
 
 require (
@@ -42,10 +42,10 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	gitlab.com/yawning/edwards25519-extra v0.0.0-20231005122941-2149dcafc266 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/image v0.24.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/image v0.43.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
