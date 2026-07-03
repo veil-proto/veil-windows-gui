@@ -23,6 +23,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 
@@ -38,10 +39,13 @@ const pollInterval = 1500 * time.Millisecond
 
 // windowW/windowH are the starting size of the main window. The window is
 // resizable (see main below) so the structured split-tunnel table has room
-// to breathe.
+// to breathe. Bumped slightly wider/taller than before (480x680) to give the
+// new card-based layout — which has more generous internal padding per the
+// spaceLG spacing scale — room to sit comfortably without immediately
+// engaging the VScroll on a typical desktop display.
 const (
-	windowW = 480
-	windowH = 680
+	windowW = 520
+	windowH = 720
 )
 
 type ui struct {
@@ -49,7 +53,7 @@ type ui struct {
 
 	// status block
 	logo      *canvas.Image
-	status    *canvas.Text
+	status    *statusBadge
 	detail    *widget.Label
 	traffic   *widget.Label
 	handshake *widget.Label
@@ -115,27 +119,30 @@ func main() {
 	w.ShowAndRun()
 }
 
-// build lays out the main window. The Connection tab is divided into three
-// card-style sections separated by thin rules (theme.ColorNameSeparator):
-// status, connection control, and import. Each section is padded so content
-// never touches the window edges, and the whole tab is wrapped in a
-// VScroll so a resize below the natural content height scrolls instead of
-// clipping. Split Tunnel, Advanced, and Logs are separate tabs alongside it.
+// build lays out the main window. The Connection tab is now three cards —
+// status, configuration, and import — each a rounded/bordered surface built
+// by newCard, stacked with spaceLG gaps instead of the old flat VBox +
+// widget.Separator rules. The status card uses the shadcn "icon/indicator
+// left, title+description+content right" horizontal layout: the app logo on
+// the left, the status badge/detail/stats stacked on the right. Each card is
+// padded so content never touches the window edges, and the whole tab is
+// wrapped in a VScroll so a resize below the natural content height scrolls
+// instead of clipping. Split Tunnel, Advanced, and Logs are separate tabs.
 func (u *ui) build() fyne.CanvasObject {
 	u.logo = canvas.NewImageFromResource(appIcon)
 	u.logo.FillMode = canvas.ImageFillContain
-	u.logo.SetMinSize(fyne.NewSize(64, 64))
+	u.logo.SetMinSize(fyne.NewSize(56, 56))
 
-	u.status = canvas.NewText("Starting...", slate)
-	u.status.TextSize = 20
-	u.status.TextStyle = fyne.TextStyle{Bold: true}
-	u.status.Alignment = fyne.TextAlignCenter
+	u.status = newStatusBadge()
 
 	u.detail = newMuted("")
+	u.detail.Alignment = fyne.TextAlignLeading
 	u.detail.Wrapping = fyne.TextTruncate
 
-	u.traffic = newMuted("")
-	u.handshake = newMuted("")
+	u.traffic = newMuted("—")
+	u.traffic.Alignment = fyne.TextAlignLeading
+	u.handshake = newMuted("—")
+	u.handshake.Alignment = fyne.TextAlignLeading
 
 	u.configSel = widget.NewSelect(nil, func(selected string) {
 		if u.configEditor != nil {
@@ -152,96 +159,84 @@ func (u *ui) build() fyne.CanvasObject {
 	u.refreshConfigs()
 
 	u.configHint = newMuted("No configs yet — import one below.")
-	u.configHint.Importance = widget.LowImportance
+	u.configHint.Alignment = fyne.TextAlignLeading
 
+	// Button hierarchy: Connect is the primary action (filled brand accent).
+	// Disconnect is a secondary/lower-emphasis action. Delete is destructive.
 	u.connectBtn = widget.NewButton("Connect", u.connectSelected)
 	u.connectBtn.Importance = widget.HighImportance
 	u.discBtn = widget.NewButton("Disconnect", u.disconnect)
+	u.discBtn.Importance = widget.MediumImportance
 	u.deleteBtn = widget.NewButton("Delete selected", u.deleteSelected)
 	u.deleteBtn.Importance = widget.DangerImportance
 
 	u.linkEntry = widget.NewEntry()
 	u.linkEntry.SetPlaceHolder("veil://...")
+	// Import link is the primary action of the import card; Paste and the
+	// file picker are secondary/low-emphasis alternates to the same goal.
 	u.importBtn = widget.NewButton("Import link", func() {
 		u.handleImportLink(u.linkEntry.Text)
 		u.linkEntry.SetText("")
 	})
+	u.importBtn.Importance = widget.HighImportance
 	u.pasteBtn = widget.NewButton("Paste", func() {
 		u.handleImportLink(u.win.Clipboard().Content())
 	})
+	u.pasteBtn.Importance = widget.LowImportance
 	u.fileBtn = widget.NewButton("Import .conf file...", u.openConfDialog)
+	u.fileBtn.Importance = widget.MediumImportance
 
-	statusBlock := container.NewVBox(
-		container.NewCenter(u.logo),
-		container.NewPadded(container.NewCenter(u.status)),
+	statsRow := container.NewGridWithColumns(2,
+		container.NewVBox(newSectionLabel("Traffic"), u.traffic),
+		container.NewVBox(newSectionLabel("Handshake"), u.handshake),
+	)
+
+	// Status card: logo on the left, badge + name/endpoint + stats stacked on
+	// the right — the shadcn "avatar left, title/description right" pattern.
+	statusRight := container.NewVBox(
+		u.status,
 		u.detail,
+		vspace(spaceSM),
+		statsRow,
 	)
+	statusCard := newCard(container.NewBorder(nil, nil, container.NewPadded(u.logo), nil, statusRight))
 
-	statsBlock := container.NewGridWithColumns(2,
-		container.NewVBox(
-			newSectionLabel("Traffic"),
-			u.traffic,
-		),
-		container.NewVBox(
-			newSectionLabel("Handshake"),
-			u.handshake,
-		),
-	)
-
-	configBlock := container.NewVBox(
-		newSectionLabel("Configuration"),
+	configCard := newCard(container.NewVBox(
+		cardTitle("Configuration"),
+		cardDescription("Choose which tunnel config to connect with."),
+		vspace(spaceSM),
 		u.configSel,
 		u.configHint,
+		vspace(spaceXS),
 		container.NewGridWithColumns(2, u.connectBtn, u.discBtn),
 		u.deleteBtn,
-	)
+	))
 
-	importBlock := container.NewVBox(
-		newSectionLabel("Import a veil:// link"),
+	importCard := newCard(container.NewVBox(
+		cardTitle("Import a veil:// link"),
+		cardDescription("Paste a link, or import a .conf file instead."),
+		vspace(spaceSM),
 		u.linkEntry,
 		container.NewGridWithColumns(2, u.importBtn, u.pasteBtn),
-		widget.NewLabel("- or -"),
 		u.fileBtn,
-	)
+	))
 
-	// The window is no longer squeezed to a fixed 440x640, so sections get a
-	// visible separator plus their own padding instead of everything being
-	// crammed edge-to-edge. NewVScroll means a taller-than-usual status/peer
-	// list (or a small window on a cramped display) never clips content —
-	// it scrolls instead of overflowing.
-	mainScreen := container.NewVScroll(container.NewPadded(
-		container.NewVBox(
-			statusBlock,
-			widget.NewSeparator(),
-			container.NewPadded(statsBlock),
-			widget.NewSeparator(),
-			container.NewPadded(configBlock),
-			widget.NewSeparator(),
-			container.NewPadded(importBlock),
-		),
+	// The window is no longer squeezed to a fixed 440x640, so cards get
+	// spaceLG gaps and their own internal padding instead of everything
+	// being crammed edge-to-edge behind bare separators. NewVScroll means a
+	// taller-than-usual status/peer list (or a small window on a cramped
+	// display) never clips content — it scrolls instead of overflowing.
+	mainScreen := container.NewVScroll(container.New(
+		&insetLayout{top: spaceLG, bottom: spaceLG, left: spaceLG, right: spaceLG},
+		container.New(layout.NewCustomPaddedVBoxLayout(spaceLG), statusCard, configCard, importCard),
 	))
 
 	return container.NewAppTabs(
 		container.NewTabItem("Connection", mainScreen),
-		container.NewTabItem("Split Tunnel", container.NewPadded(u.buildSplitTunnelTab())),
-		container.NewTabItem("Advanced", container.NewPadded(u.buildConfigTab())),
-		container.NewTabItem("Logs", container.NewPadded(u.buildLogTab())),
+		container.NewTabItem("Split Tunnel", u.buildSplitTunnelTab()),
+		container.NewTabItem("Advanced", u.buildConfigTab()),
+		container.NewTabItem("Logs", u.buildLogTab()),
 	)
-}
-
-func newMuted(s string) *widget.Label {
-	l := widget.NewLabel(s)
-	l.Alignment = fyne.TextAlignCenter
-	return l
-}
-
-// newSectionLabel renders a small, uppercased heading used to delimit the
-// three cards in the main window. Uppercase + slate colour signals "section
-// label" without competing with the status text above.
-func newSectionLabel(text string) fyne.CanvasObject {
-	l := widget.NewLabel(strings.ToUpper(text))
-	l.TextStyle = fyne.TextStyle{Bold: true}
-	return l
 }
 
 // pollLoop refreshes status every pollInterval; UI writes go through fyne.Do
@@ -269,7 +264,7 @@ func (u *ui) pollLoop() {
 
 func (u *ui) apply(resp control.Response, err error) {
 	if err != nil || !resp.OK || resp.Status == nil {
-		u.setStatus("Service unavailable", rgb(0xFF, 0x5D, 0x73))
+		u.setStatus("Service unavailable", dangerRed)
 		u.detail.SetText("Install and start veil-service first.")
 		u.traffic.SetText("—")
 		u.handshake.SetText("—")
@@ -315,10 +310,31 @@ func (u *ui) apply(resp control.Response, err error) {
 	}
 }
 
+// setStatus updates the status badge. It keeps its historic (text, color)
+// signature — every call site throughout the file passes one of the brand
+// colors below to mean a specific semantic state — and maps that color onto
+// the nearest badge tone, so the badge/pill visual (dot + tinted pill) is
+// driven by the same call sites as before without rewriting every caller to
+// pass a statusTone directly.
 func (u *ui) setStatus(text string, c color.Color) {
-	u.status.Text = text
-	u.status.Color = c
-	u.status.Refresh()
+	u.status.SetState(text, toneFromColor(c))
+}
+
+// toneFromColor maps the legacy brand colors historically passed to
+// setStatus onto the new badge's semantic tones.
+func toneFromColor(c color.Color) statusTone {
+	switch c {
+	case teal, cyan:
+		return tonePositive
+	case purple, violet, indigo:
+		return toneProgress
+	case dangerRed:
+		return toneDanger
+	case warnAmber:
+		return toneWarning
+	default:
+		return toneNeutral
+	}
 }
 
 func (u *ui) refreshConfigs() {
@@ -367,12 +383,12 @@ func (u *ui) selectedConfig() (configEntry, bool) {
 func (u *ui) connectSelected() {
 	entry, ok := u.selectedConfig()
 	if !ok {
-		u.setStatus("No config selected", rgb(0xFF, 0xD1, 0x66))
+		u.setStatus("No config selected", warnAmber)
 		return
 	}
 	text, err := os.ReadFile(entry.Path)
 	if err != nil {
-		u.setStatus("Config read failed", rgb(0xFF, 0x5D, 0x73))
+		u.setStatus("Config read failed", dangerRed)
 		u.detail.SetText(err.Error())
 		return
 	}
@@ -411,7 +427,7 @@ func (u *ui) deleteSelected() {
 				return
 			}
 			if _, err := deleteConfig(entry.Name); err != nil {
-				u.setStatus("Delete failed", rgb(0xFF, 0x5D, 0x73))
+				u.setStatus("Delete failed", dangerRed)
 				u.detail.SetText(err.Error())
 				return
 			}
@@ -430,7 +446,7 @@ func (u *ui) handleImportLink(raw string) {
 	}
 	entry, err := importLink(raw)
 	if err != nil {
-		u.setStatus("Import failed", rgb(0xFF, 0x5D, 0x73))
+		u.setStatus("Import failed", dangerRed)
 		u.detail.SetText(err.Error())
 		return
 	}
@@ -445,7 +461,7 @@ func (u *ui) handleImportLink(raw string) {
 func (u *ui) openConfDialog() {
 	fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil {
-			u.setStatus("Import failed", rgb(0xFF, 0x5D, 0x73))
+			u.setStatus("Import failed", dangerRed)
 			u.detail.SetText(err.Error())
 			return
 		}
@@ -464,7 +480,7 @@ func (u *ui) openConfDialog() {
 func (u *ui) importURI(uri fyne.URI) {
 	entry, err := importFromURI(uri)
 	if err != nil {
-		u.setStatus("Import failed", rgb(0xFF, 0x5D, 0x73))
+		u.setStatus("Import failed", dangerRed)
 		u.detail.SetText(err.Error())
 		return
 	}
@@ -485,7 +501,7 @@ func (u *ui) onDropped(_ fyne.Position, uris []fyne.URI) {
 		u.importURI(uri)
 		return
 	}
-	u.setStatus("Not a .conf file", rgb(0xFF, 0xD1, 0x66))
+	u.setStatus("Not a .conf file", warnAmber)
 }
 
 func fileExt(name string) string {

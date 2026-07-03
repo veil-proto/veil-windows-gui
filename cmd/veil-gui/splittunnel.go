@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/veil-proto/veil/config"
@@ -40,23 +42,39 @@ type splitTunnelTab struct {
 
 // buildSplitTunnelTab constructs the tab and wires a refresh whenever the
 // user switches configs in the Connection tab's selector.
+//
+// Layout: a header card (title/description + the current config name/peer
+// count + a "Reload from config" action) followed by one card per peer,
+// spaced with the same spaceLG rhythm as the Connection tab's cards. The
+// header card's toolbar mirrors the Advanced/Logs tabs so all four tabs
+// share one visual grammar: card(s), each with a title+description header
+// and — where relevant — a trailing action row.
 func (u *ui) buildSplitTunnelTab() fyne.CanvasObject {
 	st := &splitTunnelTab{u: u}
 	u.splitTunnel = st
 
 	st.entryLabel = newMuted("Select a config from the Connection tab.")
+	st.entryLabel.Alignment = fyne.TextAlignLeading
 	st.peerList = container.NewVBox()
 
 	refreshBtn := widget.NewButton("Reload from config", func() { st.refresh() })
+	refreshBtn.Importance = widget.MediumImportance
 
-	content := container.NewVScroll(container.NewVBox(
-		newSectionLabel("Split Tunnel — Allowed / Disallowed Subnets"),
+	headerCard := newCard(container.NewVBox(
+		cardTitle("Split Tunnel"),
+		cardDescription("Structured Allowed / Disallowed subnet editor, per peer."),
+		vspace(spaceSM),
 		st.entryLabel,
-		widget.NewSeparator(),
-		st.peerList,
+		container.NewBorder(nil, nil, nil, refreshBtn),
 	))
 
-	st.root = container.NewBorder(nil, container.NewPadded(refreshBtn), nil, nil, content)
+	content := container.NewVScroll(container.New(
+		&insetLayout{top: spaceLG, bottom: spaceLG, left: spaceLG, right: spaceLG},
+		container.New(layout.NewCustomPaddedVBoxLayout(spaceLG), headerCard, st.peerList),
+	))
+	st.peerList.Layout = layout.NewCustomPaddedVBoxLayout(spaceLG)
+
+	st.root = content
 
 	// Hook the existing config selector so switching configs on the
 	// Connection tab also refreshes this tab, without this tab needing its
@@ -118,7 +136,8 @@ func (st *splitTunnelTab) rebuildPeerCards() {
 		st.peerList.Add(st.buildPeerCard(i))
 	}
 	if len(st.cfg.Peers) == 0 {
-		st.peerList.Add(newMuted("This config has no peers."))
+		empty := newMuted("This config has no peers.")
+		st.peerList.Add(newCard(container.NewCenter(empty)))
 	}
 	st.peerList.Refresh()
 }
@@ -141,15 +160,32 @@ func truncateKey(hexKey string) string {
 
 // buildPeerCard renders one peer's public key plus its AllowedIPs and
 // Disallowed CIDR lists as editable rows.
+//
+// Shadcn horizontal card pattern: a small key-glyph "avatar" on the left
+// (a rounded tinted tile, echoing the status badge's dot-in-pill treatment)
+// next to the peer's truncated pubkey/copy action; below that, the Allowed
+// and Disallowed subnet sections sit side by side, each its own clearly
+// labeled sub-section rather than two bare VBoxes separated only by a grid.
 func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 	p := &st.cfg.Peers[peerIdx]
 	keyHex := peerKeyHex(*p)
 
+	avatar := keyAvatar()
+
 	keyLabel := widget.NewLabel(truncateKey(keyHex))
 	keyLabel.TextStyle = fyne.TextStyle{Monospace: true, Bold: true}
+	keySub := cardDescription(fmt.Sprintf("Peer %d", peerIdx+1))
+
 	copyBtn := widget.NewButton("Copy key", func() {
 		st.u.win.Clipboard().SetContent(keyHex)
 	})
+	copyBtn.Importance = widget.LowImportance
+
+	identity := container.NewVBox(keyLabel, keySub)
+	header := container.NewBorder(nil, nil,
+		container.NewPadded(avatar), copyBtn,
+		container.NewPadded(identity),
+	)
 
 	allowedList := container.NewVBox()
 	disallowedList := container.NewVBox()
@@ -164,6 +200,9 @@ func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 				st.persistConfig()
 				rebuildAllowed()
 			}))
+		}
+		if len(p.AllowedIPs) == 0 {
+			allowedList.Add(emptyCIDRHint())
 		}
 		allowedList.Refresh()
 	}
@@ -182,11 +221,17 @@ func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 				rebuildDisallowed()
 			}))
 		}
+		if len(cur) == 0 {
+			disallowedList.Add(emptyCIDRHint())
+		}
 		disallowedList.Refresh()
 	}
 	rebuildAllowed()
 	rebuildDisallowed()
 
+	// "+ Add CIDR" is a secondary/low-emphasis action relative to Connect —
+	// it's a frequent, low-stakes action within the card, not the page's
+	// primary call to action.
 	allowedAddBtn := widget.NewButton("+ Add CIDR", func() {
 		st.showAddDialog("Add to AllowedIPs", func(cidrs []string) {
 			p.AllowedIPs = append(p.AllowedIPs, cidrs...)
@@ -194,6 +239,7 @@ func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 			rebuildAllowed()
 		})
 	})
+	allowedAddBtn.Importance = widget.MediumImportance
 	disallowedAddBtn := widget.NewButton("+ Add CIDR", func() {
 		st.showAddDialog("Add to Disallowed", func(cidrs []string) {
 			cur := st.disallowed.PerPeer[keyHex]
@@ -202,8 +248,7 @@ func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 			rebuildDisallowed()
 		})
 	})
-
-	header := container.NewBorder(nil, nil, keyLabel, copyBtn)
+	disallowedAddBtn.Importance = widget.MediumImportance
 
 	allowedSection := container.NewVBox(
 		newSectionLabel("Allowed IPs"),
@@ -211,20 +256,49 @@ func (st *splitTunnelTab) buildPeerCard(peerIdx int) fyne.CanvasObject {
 		allowedAddBtn,
 	)
 	disallowedSection := container.NewVBox(
-		newSectionLabel("Disallowed (GUI-only; carved out at connect time)"),
+		newSectionLabel("Disallowed"),
+		cardDescription("GUI-only; carved out of AllowedIPs at connect time."),
 		disallowedList,
 		disallowedAddBtn,
 	)
 
-	card := container.NewVBox(
+	body := container.NewVBox(
 		header,
-		container.NewGridWithColumns(2, allowedSection, disallowedSection),
+		vspace(spaceSM),
 		widget.NewSeparator(),
+		vspace(spaceSM),
+		container.NewGridWithColumns(2, allowedSection, disallowedSection),
 	)
-	return card
+	return newCardTight(body)
 }
 
-// cidrRow renders one CIDR entry with a remove button.
+// keyAvatar renders a small rounded tinted tile as a stand-in "identity"
+// glyph for a peer, echoing the tinted-pill treatment used by the status
+// badge so the two "identity" visuals in the app (connection state, peer
+// key) feel like the same design language.
+func keyAvatar() fyne.CanvasObject {
+	bg := canvas.NewRectangle(washColor(violet))
+	bg.StrokeColor = violet
+	bg.StrokeWidth = 1
+	bg.CornerRadius = 8
+	glyph := canvas.NewText("🔑", fgLight)
+	glyph.TextSize = 16
+	glyph.Alignment = fyne.TextAlignCenter
+	stack := container.NewStack(bg, container.NewCenter(glyph))
+	return fixedSize(stack, fyne.NewSize(36, 36))
+}
+
+// emptyCIDRHint is the muted placeholder shown in an Allowed/Disallowed list
+// with no entries yet, so the section never renders as a suspicious blank
+// gap between its label and its "+ Add CIDR" button.
+func emptyCIDRHint() fyne.CanvasObject {
+	return cardDescription("None configured.")
+}
+
+// cidrRow renders one CIDR entry with a remove button. The remove action is
+// intentionally low-emphasis (a quiet "×") since it's a frequent, easily
+// reversible action (re-add via the dialog) rather than a destructive one
+// warranting DangerImportance treatment.
 func (st *splitTunnelTab) cidrRow(cidr string, onRemove func()) fyne.CanvasObject {
 	label := widget.NewLabel(cidr)
 	label.TextStyle = fyne.TextStyle{Monospace: true}
