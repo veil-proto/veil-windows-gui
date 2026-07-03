@@ -11,6 +11,9 @@ import (
 
 // veilTheme is the VEIL brand theme: dark navy surfaces, indigo/violet controls,
 // per the brandbook. Always dark, regardless of the OS setting.
+//
+// Sizes are overridden to produce a denser layout that fits the fixed 440x640
+// window without internal scrolling.
 type veilTheme struct{}
 
 func rgb(r, g, b uint8) color.Color { return color.NRGBA{R: r, G: g, B: b, A: 255} }
@@ -60,4 +63,26 @@ func (veilTheme) Color(name fyne.ThemeColorName, _ fyne.ThemeVariant) color.Colo
 
 func (veilTheme) Font(s fyne.TextStyle) fyne.Resource     { return theme.DefaultTheme().Font(s) }
 func (veilTheme) Icon(n fyne.ThemeIconName) fyne.Resource { return theme.DefaultTheme().Icon(n) }
-func (veilTheme) Size(n fyne.ThemeSizeName) float32       { return theme.DefaultTheme().Size(n) }
+
+// Size tightens a handful of metrics so the main window fits at 440x640:
+//   - Padding: tighter than default so sections don't blow out
+//   - InnerPadding: same for nested containers
+//   - Text: bumped very slightly so labels read at small sizes
+//   - InputBorder: thin to keep the input bar visually quiet
+func (veilTheme) Size(n fyne.ThemeSizeName) float32 {
+	switch n {
+	case theme.SizeNamePadding:
+		return 5
+	case theme.SizeNameInnerPadding:
+		return 6
+	case theme.SizeNameText:
+		return 14
+	case theme.SizeNameHeadingText:
+		return 18
+	case theme.SizeNameSeparatorThickness:
+		return 1
+	case theme.SizeNameInputBorder:
+		return 1
+	}
+	return theme.DefaultTheme().Size(n)
+}
