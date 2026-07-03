@@ -45,6 +45,7 @@ jobs:
             -d SourceDir="$PWD\dist" `
             -d Version="$env:VERSION" `
             -o "dist\VEIL-$env:VERSION-$env:SHORT_SHA-x64.msi"
+          Remove-Item dist\*.wixpdb -ErrorAction SilentlyContinue
           Get-FileHash dist\* | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } | Set-Content dist\SHA256SUMS
       - name: Publish rolling prerelease
         shell: pwsh
