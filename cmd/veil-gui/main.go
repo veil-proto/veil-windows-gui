@@ -123,7 +123,7 @@ func (u *ui) build() fyne.CanvasObject {
 	u.status.Alignment = fyne.TextAlignCenter
 
 	u.detail = newMuted("")
-	u.detail.Wrapping = fyne.TextWrapWord
+	u.detail.Wrapping = fyne.TextTruncate
 
 	u.traffic = newMuted("")
 	u.handshake = newMuted("")
@@ -165,17 +165,17 @@ func (u *ui) build() fyne.CanvasObject {
 	statusBlock := container.NewVBox(
 		container.NewCenter(u.logo),
 		container.NewPadded(container.NewCenter(u.status)),
-		container.NewCenter(u.detail),
+		u.detail,
 	)
 
 	statsBlock := container.NewGridWithColumns(2,
 		container.NewVBox(
 			newSectionLabel("Traffic"),
-			container.NewCenter(u.traffic),
+			u.traffic,
 		),
 		container.NewVBox(
 			newSectionLabel("Handshake"),
-			container.NewCenter(u.handshake),
+			u.handshake,
 		),
 	)
 
