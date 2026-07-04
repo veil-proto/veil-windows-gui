@@ -11,11 +11,13 @@ import (
 
 	"github.com/veil-proto/veil-windows/control"
 	"github.com/veil-proto/veil-windows/wintunnel"
+	"github.com/veil-proto/veil/config"
 )
 
 // persistingHandler wraps the tunnel controller and remembers the active config
-// on disk, so the service reconnects the last tunnel after a crash-restart or a
-// reboot without the tray needing to be running.
+// on disk, so the sidecar reconnects the last tunnel after a crash-restart
+// (the Tauri shell respawning it) without the frontend needing to reissue
+// Connect itself.
 type persistingHandler struct {
 	*wintunnel.Tunnel
 }
@@ -24,10 +26,14 @@ func newHandler() *persistingHandler {
 	t := &wintunnel.Tunnel{}
 	// Route the process's default log output through the tunnel's ring
 	// buffer (in addition to stderr) so every existing log.Printf call site
-	// across the engine/service code is captured for the Logs control
+	// across the engine/tunnel code is captured for the Logs control
 	// command, with no call-site changes required. This must happen before
 	// anything logs (in particular before autoReconnect below), and the
 	// buffer is process-lifetime so it survives Connect/Disconnect cycles.
+	// Critically, this must never write to os.Stdout: stdout is reserved
+	// entirely for the control-protocol's JSON response lines (ServeIO), so
+	// mixing log output into it would corrupt the wire format the Tauri
+	// shell parses.
 	log.SetOutput(io.MultiWriter(os.Stderr, t.LogBuffer()))
 	return &persistingHandler{Tunnel: t}
 }
@@ -54,8 +60,8 @@ func (h *persistingHandler) Connect(cfg, name string) error {
 	return nil
 }
 
-// Disconnect tears the tunnel down and forgets the active config, so the service
-// does not reconnect it on the next start.
+// Disconnect tears the tunnel down and forgets the active config, so the
+// sidecar does not reconnect it if respawned.
 func (h *persistingHandler) Disconnect() error {
 	if err := os.Remove(activeConfigPath()); err != nil && !os.IsNotExist(err) {
 		log.Printf("warning: clear active config: %v", err)
@@ -90,7 +96,33 @@ func loadActive() (activeConfig, bool) {
 	return a, true
 }
 
-// autoReconnect restores the previously-active tunnel on service start.
+// ParseConfig parses .conf text into the structured shape the split-tunnel
+// editor works with. Delegates entirely to github.com/veil-proto/veil/config
+// (via configconv.go's toParsedConfig) rather than duplicating INI parsing
+// in the frontend.
+func (h *persistingHandler) ParseConfig(configText string) (control.ParsedConfig, error) {
+	cfg, err := config.LoadConfigString(configText)
+	if err != nil {
+		return control.ParsedConfig{}, err
+	}
+	return toParsedConfig(cfg), nil
+}
+
+// SerializeConfig renders a structured config back into .conf text,
+// validating it first so the frontend finds out about a bad edit (e.g. a
+// malformed CIDR) before it ever reaches Connect.
+func (h *persistingHandler) SerializeConfig(pc control.ParsedConfig) (string, error) {
+	cfg, err := fromParsedConfig(pc)
+	if err != nil {
+		return "", err
+	}
+	if err := cfg.Validate(); err != nil {
+		return "", err
+	}
+	return cfg.Serialize(), nil
+}
+
+// autoReconnect restores the previously-active tunnel on sidecar start.
 func autoReconnect(h control.Handler) {
 	a, ok := loadActive()
 	if !ok {

@@ -3,3 +3,13 @@
 *.conf
 !example*.conf
 /vendor/
+*.exe
+*.dll
+
+# Vue/Vite frontend
+/node_modules/
+/src/dist/
+
+# Tauri (Rust) shell
+/src-tauri/target/
+/src-tauri/gen/
