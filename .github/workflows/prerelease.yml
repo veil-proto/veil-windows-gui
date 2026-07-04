@@ -44,8 +44,9 @@ jobs:
       - name: Build Tauri app
         shell: pwsh
         run: |
-          $config = '"{""version"":""' + $env:VERSION + '""}"'
-          npx tauri build --config $config
+          $configPath = Join-Path $env:RUNNER_TEMP "tauri-build-config.json"
+          @{ version = $env:VERSION } | ConvertTo-Json -Compress | Set-Content -NoNewline -Encoding utf8 $configPath
+          npx tauri build --config $configPath
       - name: Collect artifacts
         shell: pwsh
         run: |
