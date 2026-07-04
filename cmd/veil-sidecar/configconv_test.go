@@ -1,16 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
-	"github.com/veil-proto/veil-windows/control"
 	"github.com/veil-proto/veil/config"
 )
 
-func minimalParsedConfig() control.ParsedConfig {
-	return control.ParsedConfig{
-		Interface: control.ParsedInterface{
+func minimalParsedConfig() ParsedConfig {
+	return ParsedConfig{
+		Interface: ParsedInterface{
 			PrivateKey: validKeyHex(),
 			NID:        validKeyHex(),
 			NetSecret:  validKeyHex(),
@@ -77,6 +77,24 @@ func TestToParsedConfigThenFromParsedConfigRoundTrips(t *testing.T) {
 	}
 	if serialized := back.Serialize(); !strings.Contains(serialized, "PersistentKeepalive = 25") {
 		t.Errorf("serialized config missing PersistentKeepalive: %s", serialized)
+	}
+}
+
+func TestToParsedConfigEmitsEmptyPeersArray(t *testing.T) {
+	cfg, err := config.LoadConfigString("[Interface]\n" +
+		"PrivateKey = " + validKeyHex() + "\n" +
+		"NID = " + validKeyHex() + "\n" +
+		"NetSecret = " + validKeyHex() + "\n")
+	if err != nil {
+		t.Fatalf("LoadConfigString: %v", err)
+	}
+
+	b, err := json.Marshal(toParsedConfig(cfg))
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(b), `"peers":[]`) {
+		t.Fatalf("ParsedConfig JSON should contain an empty peers array, got %s", b)
 	}
 }
 

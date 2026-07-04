@@ -17,8 +17,6 @@ package main
 import (
 	"log"
 	"os"
-
-	"github.com/veil-proto/veil-windows/control"
 )
 
 func main() {
@@ -26,9 +24,11 @@ func main() {
 	autoReconnect(h)
 
 	log.Printf("veil-sidecar: serving control protocol on stdio")
-	(&control.Server{Handler: h}).ServeIO(os.Stdin, os.Stdout)
+	if err := serveControlIO(h, os.Stdin, os.Stdout); err != nil {
+		log.Printf("control protocol failed: %v", err)
+	}
 
-	// ServeIO returns once stdin closes (the parent process exited or closed
+	// serveControlIO returns once stdin closes (the parent process exited or closed
 	// the pipe) — tear the tunnel down instead of leaving it running orphaned.
 	if err := h.Disconnect(); err != nil {
 		log.Printf("shutdown disconnect: %v", err)

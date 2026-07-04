@@ -100,10 +100,10 @@ func loadActive() (activeConfig, bool) {
 // editor works with. Delegates entirely to github.com/veil-proto/veil/config
 // (via configconv.go's toParsedConfig) rather than duplicating INI parsing
 // in the frontend.
-func (h *persistingHandler) ParseConfig(configText string) (control.ParsedConfig, error) {
+func (h *persistingHandler) ParseConfig(configText string) (ParsedConfig, error) {
 	cfg, err := config.LoadConfigString(configText)
 	if err != nil {
-		return control.ParsedConfig{}, err
+		return ParsedConfig{}, err
 	}
 	return toParsedConfig(cfg), nil
 }
@@ -111,7 +111,7 @@ func (h *persistingHandler) ParseConfig(configText string) (control.ParsedConfig
 // SerializeConfig renders a structured config back into .conf text,
 // validating it first so the frontend finds out about a bad edit (e.g. a
 // malformed CIDR) before it ever reaches Connect.
-func (h *persistingHandler) SerializeConfig(pc control.ParsedConfig) (string, error) {
+func (h *persistingHandler) SerializeConfig(pc ParsedConfig) (string, error) {
 	cfg, err := fromParsedConfig(pc)
 	if err != nil {
 		return "", err

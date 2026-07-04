@@ -1,24 +1,22 @@
-// Package main: config <-> control.ParsedConfig conversion. Deliberately has
+// Package main: config <-> ParsedConfig conversion. Deliberately has
 // no build tag (unlike handler_windows.go) — it only touches
-// github.com/veil-proto/veil/config and github.com/veil-proto/veil-windows/control,
-// neither of which is Windows-specific, so this logic can be unit tested
-// without a Windows target.
+// github.com/veil-proto/veil/config, so this logic can be unit tested without
+// a Windows target.
 package main
 
 import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/veil-proto/veil-windows/control"
 	"github.com/veil-proto/veil/config"
 )
 
 // toParsedConfig converts a loaded Config into the JSON-friendly shape the
 // control protocol sends to the frontend. Byte fields become hex strings,
 // matching how the .conf format already represents them on disk.
-func toParsedConfig(cfg *config.Config) control.ParsedConfig {
-	pc := control.ParsedConfig{
-		Interface: control.ParsedInterface{
+func toParsedConfig(cfg *config.Config) ParsedConfig {
+	pc := ParsedConfig{
+		Interface: ParsedInterface{
 			PrivateKey:             hex.EncodeToString(cfg.Interface.PrivateKey),
 			Address:                cfg.Interface.Address,
 			BindAddress:            cfg.Interface.BindAddress,
@@ -31,9 +29,10 @@ func toParsedConfig(cfg *config.Config) control.ParsedConfig {
 			DNS:                    cfg.Interface.DNS,
 			FwMark:                 cfg.Interface.FwMark,
 		},
+		Peers: make([]ParsedPeer, 0, len(cfg.Peers)),
 	}
 	for _, p := range cfg.Peers {
-		pc.Peers = append(pc.Peers, control.ParsedPeer{
+		pc.Peers = append(pc.Peers, ParsedPeer{
 			PublicKey:           hex.EncodeToString(p.PublicKey),
 			AllowedIPs:          p.AllowedIPs,
 			Endpoint:            p.Endpoint,
@@ -46,7 +45,7 @@ func toParsedConfig(cfg *config.Config) control.ParsedConfig {
 
 // fromParsedConfig is toParsedConfig's inverse: decodes the frontend's edited
 // structured config back into a config.Config, ready for Validate()/Serialize().
-func fromParsedConfig(pc control.ParsedConfig) (*config.Config, error) {
+func fromParsedConfig(pc ParsedConfig) (*config.Config, error) {
 	privKey, err := hex.DecodeString(pc.Interface.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid PrivateKey: %w", err)
