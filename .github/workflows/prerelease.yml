@@ -50,17 +50,20 @@ jobs:
       - name: Collect artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item src-tauri\target\release\bundle\msi\*.msi dist\
-          Copy-Item src-tauri\target\release\bundle\nsis\*.exe dist\
-          Get-FileHash dist\* | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } | Set-Content dist\SHA256SUMS
+          $artifactDir = "release-artifacts"
+          Remove-Item -Recurse -Force $artifactDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $artifactDir | Out-Null
+          Copy-Item src-tauri\target\release\bundle\msi\*.msi $artifactDir\
+          Copy-Item src-tauri\target\release\bundle\nsis\*.exe $artifactDir\
+          Get-ChildItem -LiteralPath $artifactDir -File | Get-FileHash | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } | Set-Content (Join-Path $artifactDir "SHA256SUMS")
       - name: Publish rolling prerelease
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $files = Get-ChildItem -LiteralPath "release-artifacts" -File
           gh release delete prerelease --yes --cleanup-tag 2>$null
-          gh release create prerelease dist\* `
+          gh release create prerelease @($files.FullName) `
             --prerelease `
             --title "Prerelease $env:VERSION ($env:SHORT_SHA)" `
             --notes "Rolling Windows prerelease from ``$env:GITHUB_SHA``. Tauri + Vue client with the Go veil-sidecar and VEIL TUN driver bundled inside the MSI/NSIS installer."
