@@ -1,15 +1,42 @@
+# Go build artifacts / packaging
 /dist/
-*.log
-*.conf
-!example*.conf
-/vendor/
 *.exe
 *.dll
+/vendor/
+
+# Config files with real key material (never commit)
+*.conf
+!example*.conf
+
+# Logs
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # Vue/Vite frontend
-/node_modules/
-/src/dist/
+node_modules
+dist
+dist-ssr
+*.local
 
 # Tauri (Rust) shell
 /src-tauri/target/
 /src-tauri/gen/
+# Built externalBin sidecar (produced by `go build`, see cmd/veil-sidecar) —
+# a build artifact, not source; CI builds it fresh before `tauri build`.
+/src-tauri/binaries/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

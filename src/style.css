@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn-vue/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * VEIL brand palette, ported from the Fyne GUI's theme.go so the shadcn-vue
+ * component set (which reads these as CSS variables) renders in the same
+ * dark navy/indigo/violet/cyan visual language as before, not shadcn's
+ * default neutral theme. Dark mode only — the VEIL brand has no light theme,
+ * so `.dark` is applied unconditionally in App.vue rather than following
+ * prefers-color-scheme; both selectors below carry identical values so
+ * nothing changes if that ever needs to be revisited.
+ */
+:root,
+.dark {
+  --navy-900: #071126;
+  --navy-950: #050814;
+  --indigo: #343b8f;
+  --violet: #6d43e6;
+  --purple: #8758ff;
+  --cyan: #25d7e8;
+  --teal: #46f0e5;
+  --slate-brand: #53627f;
+  --fg-light: #e6eaf5;
+  --input-bg: #0a1833;
+  --separator: #1a2444;
+  --card-bg: #0c1730;
+  --card-border: #222e54;
+  --muted-fg: #9aa5c3;
+  --danger-red: #ff5d73;
+  --warn-amber: #ffd166;
+
+  --background: var(--navy-950);
+  --foreground: var(--fg-light);
+  --card: var(--card-bg);
+  --card-foreground: var(--fg-light);
+  --popover: var(--card-bg);
+  --popover-foreground: var(--fg-light);
+  --primary: var(--violet);
+  --primary-foreground: var(--fg-light);
+  --secondary: var(--indigo);
+  --secondary-foreground: var(--fg-light);
+  --muted: var(--input-bg);
+  --muted-foreground: var(--muted-fg);
+  --accent: var(--purple);
+  --accent-foreground: var(--fg-light);
+  --destructive: var(--danger-red);
+  --destructive-foreground: var(--fg-light);
+  --border: var(--card-border);
+  --input: var(--input-bg);
+  --ring: var(--violet);
+  --radius: 0.625rem;
+
+  /* Unused by any view today (no charts/sidebar), set for completeness so a
+     future component that reads them doesn't fall back to shadcn's neutral
+     defaults. */
+  --chart-1: var(--violet);
+  --chart-2: var(--purple);
+  --chart-3: var(--cyan);
+  --chart-4: var(--teal);
+  --chart-5: var(--indigo);
+  --sidebar: var(--navy-900);
+  --sidebar-foreground: var(--fg-light);
+  --sidebar-primary: var(--violet);
+  --sidebar-primary-foreground: var(--fg-light);
+  --sidebar-accent: var(--purple);
+  --sidebar-accent-foreground: var(--fg-light);
+  --sidebar-border: var(--card-border);
+  --sidebar-ring: var(--violet);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-veil-navy-900: var(--navy-900);
+  --color-veil-navy-950: var(--navy-950);
+  --color-veil-cyan: var(--cyan);
+  --color-veil-teal: var(--teal);
+  --color-veil-slate: var(--slate-brand);
+  --color-veil-danger: var(--danger-red);
+  --color-veil-warning: var(--warn-amber);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

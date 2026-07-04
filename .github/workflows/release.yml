@@ -20,35 +20,40 @@ jobs:
         with:
           go-version: '1.26'
           check-latest: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
-      - name: Build binaries
+      - name: Install frontend deps
+        run: npm ci
+      - name: Build sidecar
         shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
           $env:Path = "C:\msys64\mingw64\bin;$env:Path"
           $env:CGO_ENABLED = "1"
-          go build -trimpath -ldflags "-s -w -H windowsgui" -o dist\veil-gui.exe .\cmd\veil-gui
-          go build -trimpath -ldflags "-s -w" -o dist\veil-service.exe .\cmd\veil-service
-          Copy-Item driver\amd64\veiltun.dll dist\veiltun.dll
-      - name: Build MSI
+          New-Item -ItemType Directory -Force src-tauri\binaries | Out-Null
+          go build -trimpath -ldflags "-s -w" -o src-tauri\binaries\veil-sidecar-x86_64-pc-windows-msvc.exe .\cmd\veil-sidecar
+      - name: Build Tauri app
         shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          dotnet tool install --global wix --version 5.0.2
-          $env:Path += ";$env:USERPROFILE\.dotnet\tools"
-          wix build packaging\veil.wxs `
-            -arch x64 `
-            -d SourceDir="$PWD\dist" `
-            -d Version="$env:VERSION" `
-            -o "dist\VEIL-$env:VERSION-x64.msi"
-          Remove-Item dist\*.wixpdb -ErrorAction SilentlyContinue
+          npx tauri build --config "{\"version\":\"$env:VERSION\"}"
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item src-tauri\target\release\bundle\msi\*.msi dist\
+          Copy-Item src-tauri\target\release\bundle\nsis\*.exe dist\
           Get-FileHash dist\* | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } | Set-Content dist\SHA256SUMS
       - name: Publish release
         shell: pwsh
@@ -57,5 +62,5 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           gh release create "v$env:VERSION" dist\* `
-            --title "VEIL Windows GUI $env:VERSION" `
-            --notes "Manual VEIL Windows GUI release $env:VERSION."
+            --title "VEIL $env:VERSION" `
+            --notes "VEIL Windows client $env:VERSION (Tauri + Vue, Go veil-sidecar)."
