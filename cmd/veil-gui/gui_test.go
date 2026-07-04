@@ -5,10 +5,12 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/storage"
+	"github.com/veil-proto/veil-windows/control"
 	"github.com/veil-proto/veil/link"
 )
 
@@ -23,6 +25,14 @@ func TestHuman(t *testing.T) {
 		if got := human(n); got != want {
 			t.Fatalf("human(%d) = %q, want %q", n, got, want)
 		}
+	}
+}
+
+func TestFormatLogLinePreservesServiceMessage(t *testing.T) {
+	msg := "2026/07/04 00:45:18 VEIL adapter veil0 up (LUID 14918723538255872)"
+	got := formatLogLine(control.LogLine{Seq: 1, Time: 1783115118, Msg: msg})
+	if !strings.Contains(got, msg) {
+		t.Fatalf("formatted log line %q does not contain service message %q", got, msg)
 	}
 }
 

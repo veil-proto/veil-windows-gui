@@ -101,16 +101,19 @@ func (u *ui) appendLogs(lines []control.LogLine) {
 		if b.Len() > 0 {
 			b.WriteByte('\n')
 		}
-		ts := time.Unix(l.Time, 0).Format("15:04:05")
-		if l.Level != "" {
-			fmt.Fprintf(&b, "[%s] %s: %s", ts, l.Level, l.Msg)
-		} else {
-			fmt.Fprintf(&b, "[%s] %s", ts, l.Msg)
-		}
+		b.WriteString(formatLogLine(l))
 	}
 	u.logViewer.SetText(b.String())
 	u.logViewer.CursorRow = strings.Count(b.String(), "\n")
 	u.logViewer.Refresh()
+}
+
+func formatLogLine(l control.LogLine) string {
+	ts := time.Unix(l.Time, 0).Format("15:04:05")
+	if l.Level != "" {
+		return fmt.Sprintf("[%s] %s: %s", ts, l.Level, l.Msg)
+	}
+	return fmt.Sprintf("[%s] %s", ts, l.Msg)
 }
 
 func (u *ui) saveConfigEditor() {
